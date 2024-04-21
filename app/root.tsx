@@ -16,6 +16,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
+        <nav style={{ display: "flex", gap: 10 }}>
+          <a href="/">Home</a>
+          <a href="/server/posts">Posts (Server)</a>
+          <a href="/client/posts">Posts (Client)</a>
+        </nav>
         {children}
         <ScrollRestoration />
         <Scripts />

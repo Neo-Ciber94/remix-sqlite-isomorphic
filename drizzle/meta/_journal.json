@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1713734583679,
+      "tag": "0000_opposite_stone_men",
+      "breakpoints": true
+    }
+  ]
+}
