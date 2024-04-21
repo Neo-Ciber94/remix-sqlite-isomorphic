@@ -1,89 +1,54 @@
 import type { MetaFunction } from "@remix-run/node";
 import { Link } from "@remix-run/react";
-import { InferSelectModel } from "drizzle-orm";
-import { useEffect, useState } from "react";
-import { posts as PostTable } from "~/lib/db/schema";
+import { count, eq, InferSelectModel } from "drizzle-orm";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { posts, comments } from "~/lib/db/schema";
 import { loadDatabase } from "~/lib/db/client";
 
 export const meta: MetaFunction = () => {
   return [{ title: "Posts (Client)" }];
 };
 
-type Post = InferSelectModel<typeof PostTable> & { commentCount: number };
+type Post = InferSelectModel<typeof posts> & { commentCount: number };
 
 export default function PostsClientPage() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { data: allPosts, isLoading, invalidate } = usePosts();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [actionResult, setActionResult] = useState<{ error: string } | null>(
-    null
-  );
+  const [actionData, setActionData] = useState<{ error: string } | null>(null);
 
-  useEffect(() => {
-    let discard = false;
+  async function handleSubmit(ev: React.FormEvent<HTMLFormElement>) {
+    ev.preventDefault();
 
-    (async () => {
-      try {
-        if (discard) {
-          return;
-        }
+    try {
+      setIsSubmitting(true);
+      const data = new FormData(ev.currentTarget);
+      const title = data.get("title");
+      const content = data.get("content");
 
-        setIsLoading(true);
-        const db = await loadDatabase();
-        const data = await db.query.posts.findMany({
-          with: { comments: true },
-        });
-        const postsWithCommentCount = data.map((post) => ({
-          ...post,
-          commentCount: post.comments.length,
-        }));
-
-        console.log(data);
-        setPosts(postsWithCommentCount);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+      if (typeof title !== "string" || title.trim().length === 0) {
+        return setActionData({ error: "Title is required" });
       }
-    })();
 
-    return () => {
-      discard = true;
-    };
-  }, []);
+      if (typeof content !== "string" || content.trim().length === 0) {
+        return setActionData({ error: "Content is required" });
+      }
+
+      const db = await loadDatabase();
+      await db.insert(posts).values({ title, content }).returning();
+      await db.$write();
+      invalidate();
+    } catch (err) {
+      console.error(err);
+      setActionData({ error: "Failed to add post" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div>
       <h1>Posts (Local)</h1>
-      <form
-        onSubmit={async (ev) => {
-          ev.preventDefault();
-
-          try {
-            setIsSubmitting(true);
-            const data = new FormData(ev.currentTarget);
-            const title = data.get("title");
-            const content = data.get("content");
-
-            if (typeof title !== "string" || title.trim().length === 0) {
-              return setActionResult({ error: "Title is required" });
-            }
-
-            if (typeof content !== "string" || content.trim().length === 0) {
-              return setActionResult({ error: "Content is required" });
-            }
-
-            const db = await loadDatabase();
-            await db.insert(PostTable).values({ title, content }).returning();
-            await db.$write();
-          } catch (err) {
-            console.error(err);
-            setActionResult({ error: "Failed to add post" });
-          } finally {
-            setIsSubmitting(false);
-          }
-        }}
-      >
+      <form onSubmit={handleSubmit}>
         <input name="title" placeholder="Title" required />
         <br />
 
@@ -95,16 +60,16 @@ export default function PostsClientPage() {
         </button>
         <br />
 
-        {actionResult?.error && (
-          <small style={{ color: "red" }}>{actionResult.error}</small>
+        {actionData?.error && (
+          <small style={{ color: "red" }}>{actionData.error}</small>
         )}
       </form>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {isLoading && <h1>Loading...</h1>}
-        {!isLoading && posts.length === 0 && <h1>No posts available</h1>}
+        {!isLoading && allPosts.length === 0 && <h1>No posts available</h1>}
 
-        {posts.map((post) => {
+        {allPosts.map((post) => {
           return (
             <Link
               key={post.id}
@@ -125,4 +90,46 @@ export default function PostsClientPage() {
       </div>
     </div>
   );
+}
+
+function usePosts() {
+  const isInit = useRef(false);
+  const [data, setData] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const invalidate = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const db = await loadDatabase();
+      const result = await db
+        .select({
+          id: posts.id,
+          title: posts.title,
+          content: posts.content,
+          createdAt: posts.createdAt,
+          commentCount: count(comments.id),
+        })
+        .from(posts)
+        .leftJoin(comments, eq(comments.postId, posts.id))
+        .groupBy(posts.id);
+
+      console.log(result);
+      setData(result);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isInit.current) {
+      return;
+    }
+
+    isInit.current = true;
+    invalidate().catch(console.error);
+  }, [invalidate]);
+
+  return { data, isLoading, invalidate };
 }

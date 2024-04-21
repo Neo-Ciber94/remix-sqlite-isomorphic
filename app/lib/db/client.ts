@@ -36,23 +36,24 @@ async function createSqliteDatabase(opts?: CreateSqliteDatabaseOptions) {
   const shouldInit = buffer == null;
   const database = new SQL.Database(buffer);
 
-  if (shouldInit && initSql) {
-    try {
-      console.log("⌛ Initializing database...");
-      console.log(`📝 Running: \n\n${initSql}`);
-      const sqlResult = database.exec(initSql);
-      console.log(`✅ Database was initialized: '${sqlResult}'`);
-    } catch (err) {
-      console.error(`❌ Failed to initialize database`, err);
-    }
-  }
-
   /**
    * Write this database to the browser storage.
    */
   async function write() {
     const data = database.export();
     await store.set(name, data.buffer);
+  }
+
+  if (shouldInit && initSql) {
+    try {
+      console.log("⌛ Initializing database...");
+      console.log(`📝 Running: \n\n${initSql}`);
+      const sqlResult = database.exec(initSql);
+      await write();
+      console.log(`✅ Database was initialized: '${sqlResult}'`);
+    } catch (err) {
+      console.error(`❌ Failed to initialize database`, err);
+    }
   }
 
   return {

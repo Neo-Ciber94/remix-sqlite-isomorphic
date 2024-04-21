@@ -54,7 +54,7 @@ export async function action(args: ActionFunctionArgs) {
 
 export default function PostDetailsPage() {
   const post = useLoaderData<typeof loader>();
-  const actionResult = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>();
   const { state } = useNavigation();
   const isSubmitting = state === "submitting";
 
@@ -88,8 +88,8 @@ export default function PostDetailsPage() {
           </button>
 
           <br />
-          {actionResult?.error && (
-            <small style={{ color: "red" }}>{actionResult.error}</small>
+          {actionData?.error && (
+            <small style={{ color: "red" }}>{actionData.error}</small>
           )}
         </Form>
       </div>

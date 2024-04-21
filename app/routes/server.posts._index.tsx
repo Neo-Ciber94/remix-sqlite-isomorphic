@@ -7,26 +7,28 @@ import {
   useLoaderData,
   useNavigation,
 } from "@remix-run/react";
+import { count, eq } from "drizzle-orm";
 import { db } from "~/lib/db";
-import { posts } from "~/lib/db/schema";
+import { comments, posts } from "~/lib/db/schema";
 
 export const meta: MetaFunction = () => {
   return [{ title: "Posts" }];
 };
 
 export async function loader() {
-  // TODO: Make a join and only include the comment count
-  const posts = await db.query.posts.findMany({
-    with: {
-      comments: true,
-    },
-  });
+  const result = await db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      content: posts.content,
+      createdAt: posts.createdAt,
+      commentCount: count(comments.id),
+    })
+    .from(posts)
+    .leftJoin(comments, eq(comments.postId, posts.id))
+    .groupBy(posts.id);
 
-  const postsWithCommentCount = posts.map((post) => ({
-    ...post,
-    commentCount: post.comments.length,
-  }));
-  return json(postsWithCommentCount);
+  return json(result);
 }
 
 export async function action(args: ActionFunctionArgs) {
@@ -47,8 +49,8 @@ export async function action(args: ActionFunctionArgs) {
 }
 
 export default function PostsPage() {
-  const posts = useLoaderData<typeof loader>();
-  const actionResult = useActionData<typeof action>();
+  const allPosts = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const { state } = useNavigation();
   const isSubmitting = state === "submitting";
 
@@ -67,15 +69,15 @@ export default function PostsPage() {
         </button>
         <br />
 
-        {actionResult?.error && (
-          <small style={{ color: "red" }}>{actionResult.error}</small>
+        {actionData?.error && (
+          <small style={{ color: "red" }}>{actionData.error}</small>
         )}
       </Form>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {posts.length === 0 && <h1>No posts available</h1>}
+        {allPosts.length === 0 && <h1>No posts available</h1>}
 
-        {posts.map((post) => {
+        {allPosts.map((post) => {
           return (
             <Link
               key={post.id}
