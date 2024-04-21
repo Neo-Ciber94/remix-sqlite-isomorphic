@@ -54,7 +54,7 @@ export default function PostsClientPage() {
 
   return (
     <div>
-      <h1>Posts</h1>
+      <h1>Posts (Local)</h1>
       <form
         onSubmit={async (ev) => {
           ev.preventDefault();
@@ -108,7 +108,7 @@ export default function PostsClientPage() {
           return (
             <Link
               key={post.id}
-              to={`/client/posts/${post.id}`}
+              to={`/local/posts/${post.id}`}
               style={{ padding: 4, border: "1px solid #ccc" }}
             >
               <h3>{post.title}</h3>

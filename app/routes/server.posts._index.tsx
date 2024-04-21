@@ -54,7 +54,7 @@ export default function PostsPage() {
 
   return (
     <div>
-      <h1>Posts</h1>
+      <h1>Posts (Server)</h1>
       <Form method="post">
         <input name="title" placeholder="Title" required />
         <br />
