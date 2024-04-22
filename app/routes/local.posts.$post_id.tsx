@@ -1,5 +1,5 @@
 import { useParams } from "@remix-run/react";
-import { InferSelectModel } from "drizzle-orm";
+import { eq, InferSelectModel } from "drizzle-orm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { loadDatabase } from "~/lib/db/client";
@@ -9,8 +9,8 @@ type Comment = InferSelectModel<typeof comments>;
 type Post = InferSelectModel<typeof posts> & { comments: Comment[] };
 
 export default function LocalPostDetailPage() {
-  const { postId } = useParams();
-  const { data: post, isLoading, invalidate } = usePostById(String(postId));
+  const { post_id } = useParams();
+  const { data: post, isLoading, invalidate } = usePostById(String(post_id));
   const [actionData, setActionData] = useState<{ error: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -30,7 +30,7 @@ export default function LocalPostDetailPage() {
 
       const db = await loadDatabase();
       await db.insert(comments).values({
-        postId,
+        postId: post_id,
         content,
       });
 
@@ -97,16 +97,35 @@ function usePostById(postId: string) {
     try {
       setIsLoading(true);
       const db = await loadDatabase();
-      const result = await db.query.posts.findFirst({
-        where(model, { eq }) {
-          return eq(model.id, postId);
-        },
-        with: {
-          comments: true,
-        },
-      });
+      const results = db
+        .select()
+        .from(posts)
+        .where(eq(posts.id, postId))
+        .leftJoin(comments, eq(comments.postId, postId))
+        .all();
 
-      console.log({ result });
+      const result = results.reduce<Post | undefined>((prev, obj) => {
+        if (obj.post == null) {
+          return prev;
+        }
+
+        if (!prev) {
+          return { ...obj.post, comments: [] };
+        }
+
+        if (obj.comment) {
+          return {
+            id: prev.id,
+            title: prev.title,
+            content: prev.content,
+            createdAt: prev.createdAt,
+            comments: [...prev.comments, obj.comment],
+          };
+        }
+
+        return prev;
+      }, undefined);
+
       setData(result);
     } catch (err) {
       console.error(err);
