@@ -113,7 +113,6 @@ function usePosts() {
         .leftJoin(comments, eq(comments.postId, posts.id))
         .groupBy(posts.id);
 
-      console.log(result);
       setData(result);
     } catch (err) {
       console.error(err);
